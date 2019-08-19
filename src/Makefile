@@ -18,7 +18,7 @@ DEF = la_smooth_ks.def
 all: $(TARGET)
 
 $(TARGET): $(OBJ) $(DEF)
-	$(LD) $(LDFLAGS) -o $(TARGET) $(OBJS) $(RES) $(DEF) $(LIBS)
+	$(LD) $(LDFLAGS) -o $(TARGET) $(OBJ) $(RES) $(DEF) $(LIBS)
 
 .c.o:
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $<

@@ -9,7 +9,7 @@
 //		フィルタ構造体定義
 //---------------------------------------------------------------------
 #define CHECK_N 2
-static TCHAR check_name0[] = "非中心化2次モーメントで領域を選択";
+static TCHAR check_name0[] = "注目点中心2次モーメントで領域を選択";
 static TCHAR check_name1[] = "色差のみ平均化";
 static TCHAR *check_name[CHECK_N] = {check_name0, check_name1};
 static int check_default[CHECK_N]  = {0, 0};
@@ -27,13 +27,15 @@ FILTER_DLL filter = {
 	check_name,
 	check_default,
 	func_proc,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0,
+	NULL, // func_init
+	func_exit,
+	NULL, NULL, NULL, NULL, NULL, 0,
 	filter_information,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	0, 0 // reserve
 };
 
-EXTERN_C FILTER_DLL __declspec(dllexport) * __stdcall 
+EXTERN_C FILTER_DLL __declspec(dllexport) * __stdcall
 GetFilterTable(void)
 {
 	return &filter;
@@ -48,3 +50,9 @@ func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 	return TRUE;
 }
 
+BOOL
+func_exit(FILTER *fp)
+{
+	// OutputDebugString("func_exit called\n");
+	return TRUE;
+}
