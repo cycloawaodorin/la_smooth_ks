@@ -127,7 +127,7 @@ FILTER_DLL filter = {
 	check_default,
 	func_proc,
 	NULL, // func_init
-	func_exit,
+	NULL, // func_exit
 	NULL, NULL, NULL, NULL, NULL, 0,
 	filter_information,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -263,11 +263,4 @@ get_mean_cr(FILTER_PROC_INFO *fpip, int area_idx, int x, int y)
 	}
 
 	return static_cast<short>(sum/i);
-}
-
-BOOL
-func_exit(FILTER *fp)
-{
-	// OutputDebugString("func_exit called\n");
-	return TRUE;
 }
