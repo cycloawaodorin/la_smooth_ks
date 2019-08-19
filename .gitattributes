@@ -1,0 +1,3 @@
+/src/filter.h linguist-vendored
+*.md linguist-documentation
+/LICENSE linguist-documentation
