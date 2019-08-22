@@ -2,107 +2,17 @@
 //		局所領域選択・平均化フィルタ
 //----------------------------------------------------------------------------------
 #include <windows.h>
+#include <stdlib.h>
 #include "filter.h"
 #include "version.h"
-#define YCP_EDIT(fpip,x,y) ((fpip)->ycp_edit+(x)+(fpip)->max_w*(y))
-#define YCP_TEMP(fpip,x,y) ((fpip)->ycp_temp+(x)+(fpip)->max_w*(y))
-#define NR 25
-#define NA 45
-#define NL 25
-#define NI 9
 
-//相対座標リスト
-static signed char rels[NR][2] = {
-	{-2, -2}, {-1, -2}, {0, -2}, {1, -2}, {2, -2},
-	{-2, -1}, {-1, -1}, {0, -1}, {1, -1}, {2, -1},
-	{-2, 0}, {-1, 0}, {0, 0}, {1, 0}, {2, 0},
-	{-2, 1}, {-1, 1}, {0, 1}, {1, 1}, {2, 1},
-	{-2, 2}, {-1, 2}, {0, 2}, {1, 2}, {2, 2},
-};
+#define RANGE 3
+static float *mean_y[RANGE] = {nullptr, nullptr, nullptr};
+static float *var_y[RANGE] = {nullptr, nullptr, nullptr};
+static struct {
+	int range, w;
+} allocated = {0, 0};
 
-//領域(relsの指数の集合)リスト
-static char areas[NA][NI] = {
-	{ 0,  1,  5,  6,  7, 11, 12, NR, NR},
-	{ 1,  2,  3,  6,  7,  8, 12, NR, NR},
-	{ 3,  4,  7,  8,  9, 12, 13, NR, NR},
-	{ 5,  6, 10, 11, 12, 15, 16, NR, NR},
-	{ 6,  7,  8, 11, 12, 13, 16, 17, 18},
-	{ 8,  9, 12, 13, 14, 18, 19, NR, NR},
-	{11, 12, 15, 16, 17, 20, 21, NR, NR},
-	{12, 16, 17, 18, 21, 22, 23, NR, NR},
-	{12, 13, 17, 18, 19, 23, 24, NR, NR},
-	{10, 11, 12, 15, 16, NR, NR, NR, NR},
-	{12, 15, 16, 20, 21, NR, NR, NR, NR},
-	{12, 17, 21, 22, 23, NR, NR, NR, NR},
-	{12, 18, 19, 23, 24, NR, NR, NR, NR},
-	{12, 13, 14, 18, 19, NR, NR, NR, NR},
-	{11, 12, 13, 16, 17, 18, NR, NR, NR},
-	{ 2,  3,  7,  8, 12, NR, NR, NR, NR},
-	{ 3,  4,  8,  9, 12, NR, NR, NR, NR},
-	{ 9, 12, 13, 14, 19, NR, NR, NR, NR},
-	{12, 17, 18, 22, 23, NR, NR, NR, NR},
-	{ 7,  8, 12, 13, 17, 18, NR, NR, NR},
-	{ 1,  2,  6,  7, 12, NR, NR, NR, NR},
-	{ 0,  1,  5,  6, 12, NR, NR, NR, NR},
-	{ 5, 10, 11, 12, 15, NR, NR, NR, NR},
-	{12, 16, 17, 21, 22, NR, NR, NR, NR},
-	{ 6,  7, 11, 12, 16, 17, NR, NR, NR},
-	{ 5,  6, 10, 11, 12, NR, NR, NR, NR},
-	{ 1,  2,  3,  7, 12, NR, NR, NR, NR},
-	{ 8,  9, 12, 13, 14, NR, NR, NR, NR},
-	{ 6,  7,  8, 11, 12, 13, NR, NR, NR},
-	{12, 13, 17, 18, NR, NR, NR, NR, NR},
-	{12, 17, 22, 23, NR, NR, NR, NR, NR},
-	{12, 18, 24, NR, NR, NR, NR, NR, NR},
-	{12, 13, 14, 18, NR, NR, NR, NR, NR},
-	{11, 12, 16, 17, NR, NR, NR, NR, NR},
-	{10, 11, 12, 15, NR, NR, NR, NR, NR},
-	{12, 16, 20, NR, NR, NR, NR, NR, NR},
-	{12, 17, 21, 22, NR, NR, NR, NR, NR},
-	{ 7,  8, 12, 13, NR, NR, NR, NR, NR},
-	{ 2,  3,  7, 12, NR, NR, NR, NR, NR},
-	{ 4,  8, 12, NR, NR, NR, NR, NR, NR},
-	{ 9, 12, 13, 14, NR, NR, NR, NR, NR},
-	{ 6,  7, 11, 12, NR, NR, NR, NR, NR},
-	{ 5, 10, 11, 12, NR, NR, NR, NR, NR},
-	{ 0,  6, 12, NR, NR, NR, NR, NR, NR},
-	{ 1,  2,  7, 12, NR, NR, NR, NR, NR},
-};
-
-//領域選択肢(areasの指数の集合)リスト
-static char locals[NL][NI] = {            // y, x
-	{29, 30, 31, 32, NA, NA, NA, NA, NA}, // 0, 0
-	{12, 13, 14, 18, 23, NA, NA, NA, NA}, // 0, 1
-	{ 9, 10, 11, 12, 13, 14, NA, NA, NA}, // 0, *
-	{ 9, 10, 14, 18, 28, NA, NA, NA, NA}, // 0,-2
-	{33, 34, 35, 36, NA, NA, NA, NA, NA}, // 0,-1
-	{13, 15, 16, 19, 27, NA, NA, NA, NA}, // 1, 0
-	{ 4,  5,  7,  8, NA, NA, NA, NA, NA}, // 1, 1
-	{ 3,  4,  5,  6,  7,  8, NA, NA, NA}, // 1, *
-	{ 3,  4,  6,  7, NA, NA, NA, NA, NA}, // 1,-2
-	{ 9, 10, 23, 24, 25, NA, NA, NA, NA}, // 1,-1
-	{12, 15, 16, 17, 18, 19, NA, NA, NA}, // *, 0
-	{ 1,  2,  4,  5,  7,  8, NA, NA, NA}, // *, 1
-	{ 0,  1,  2,  3,  4,  5,  6,  7,  8}, // *, *
-	{ 0,  1,  3,  4,  6,  7, NA, NA, NA}, // *,-2
-	{10, 20, 21, 22, 23, 24, NA, NA, NA}, // *,-1
-	{13, 15, 16, 19, 27, NA, NA, NA, NA}, //-2, 0
-	{ 1,  2,  4,  5, NA, NA, NA, NA, NA}, //-2, 1
-	{ 0,  1,  2,  3,  4,  5, NA, NA, NA}, //-2, *
-	{ 0,  1,  2,  4,  5, NA, NA, NA, NA}, //-2,-2
-	{ 9, 20, 21, 24, 25, NA, NA, NA, NA}, //-2,-1
-	{37, 38, 39, 40, NA, NA, NA, NA, NA}, //-1, 0
-	{15, 16, 20, 27, 28, NA, NA, NA, NA}, //-1, 1
-	{16, 21, 25, 26, 27, 28, NA, NA, NA}, //-1, *
-	{15, 16, 20, 27, 28, NA, NA, NA, NA}, //-1,-2
-	{41, 42, 43, 44, NA, NA, NA, NA, NA}, //-1,-1
-};
-
-static void set_smoothed(FILTER *fp, FILTER_PROC_INFO *fpip, int local_idx, int x, int y);
-static int get_variance(FILTER *fp, FILTER_PROC_INFO *fpip, int area_idx, int x, int y);
-static short get_mean_y(FILTER_PROC_INFO *fpip, int area_idx, int x, int y);
-static short get_mean_cb(FILTER_PROC_INFO *fpip, int area_idx, int x, int y);
-static short get_mean_cr(FILTER_PROC_INFO *fpip, int area_idx, int x, int y);
 
 //---------------------------------------------------------------------
 //		フィルタ構造体定義
@@ -127,7 +37,7 @@ FILTER_DLL filter = {
 	check_default,
 	func_proc,
 	NULL, // func_init
-	NULL, // func_exit
+	func_exit,
 	NULL, NULL, NULL, NULL, NULL, 0,
 	filter_information,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -140,24 +50,72 @@ GetFilterTable(void)
 	return &filter;
 }
 
+BOOL
+func_exit(FILTER *fp)
+{
+	for ( int i=0; i<allocated.range; i++ ) {
+		free(mean_y[i]);
+		mean_y[i] = nullptr;
+		free(var_y[i]);
+		var_y[i] = nullptr;
+	}
+	allocated.range = 0;
+	allocated.w = 0;
+	
+	return TRUE;
+}
+
 //---------------------------------------------------------------------
 //		フィルタ処理関数
 //---------------------------------------------------------------------
+#define YCP_EDIT(fpip, x, y) ((fpip)->ycp_edit+(x)+(fpip)->max_w*(y))
+#define YCP_TEMP(fpip, x, y) ((fpip)->ycp_temp+(x)+(fpip)->max_w*(y))
+#define PMOD(a, b) ( a<0 ? a%b+b : a%b )
+
+static int imin, imax;
+
+static void set_mean_var(FILTER_PROC_INFO *fpip, int ii, int y);
+static void set_smoothed(FILTER_PROC_INFO *fpip, int x, int y, int offset);
+
+// 本体
 BOOL
 func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 {
-	int i = -1;
-	for (int y=0; y<fpip->h; y++) {
-		if (y<=2 || y>=fpip->h-2) {
-		} else {
-			i -= 5;
-		}
-		for (int x=0; x<fpip->w; x++){
-			if (x<=2 || x>=fpip->w-2) {
-				i++;
+	if ( fpip->h < (RANGE*2-1) || fpip->w < (RANGE*2-1) ) {
+		OutputDebugString("The image width or height is too small for the range.");
+		return FALSE;
+	}
+	if ( allocated.range < RANGE || allocated.w < fpip->w ) {
+		func_exit(fp);
+		allocated.range = RANGE;
+		allocated.w = fpip->w;
+		for (int i=0; i<RANGE; i++) {
+			mean_y[i] = static_cast<float *>( malloc(sizeof(int)*static_cast<size_t>(fpip->w+RANGE)) );
+			if ( mean_y[i] == nullptr ) {
+				OutputDebugString("Memory allocation failed.");
+				return FALSE;
 			}
-			set_smoothed(fp, fpip, i, x, y);
+			var_y[i] = static_cast<float *>( malloc(sizeof(int)*static_cast<size_t>(fpip->w+RANGE)) );
+			if ( var_y[i] == nullptr ) {
+				OutputDebugString("Memory allocation failed.");
+				return FALSE;
+			}
 		}
+	}
+	
+	imin = -(RANGE/2);
+	imax = imin + RANGE;
+	int offset = -imin;
+	for (int i=imin; i<imax-1; i++) {
+		set_mean_var(fpip, PMOD(i+offset, RANGE), i);
+	}
+	for (int y=0; y<fpip->h; y++) {
+		int i=imax-1;
+		set_mean_var(fpip, PMOD(i+offset, RANGE), y+i);
+		for (int x=0; x<fpip->w; x++) {
+			set_smoothed(fpip, x, y, offset);
+		}
+		offset = PMOD(offset+1, RANGE);
 	}
 
 	PIXEL_YC *swap = fpip->ycp_edit;
@@ -167,100 +125,39 @@ func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 	return TRUE;
 }
 
-//---------------------------------------------------------------------
-//locals[local_idx]に基づき，(x, y)の周囲で最も輝度のばらつきが少ない領域を探査。
-//見つかった領域での平均値をycp_tempに書き込む。
+// すべての x について，y を中心とした mean_y, var_y を i にセット
 static void
-set_smoothed(FILTER *fp, FILTER_PROC_INFO *fpip, int local_idx, int x, int y)
+set_mean_var(FILTER_PROC_INFO *fpip, int ii, int y)
 {
-	int min = get_variance(fp, fpip, locals[local_idx][0], x, y);
-	int min_idx = 0;
-	for (int i=1; i<NI; i++) {
-		int temp = locals[local_idx][i];
-		if ( temp == NA ) {
-			break;
-		}
-		temp = get_variance(fp, fpip, temp, x, y);
-		if ( temp < min ) {
-			min = temp;
-			min_idx = i;
+	int vskip = 0;
+	for (int x=0; x<fpip->w; x++) {
+		YCP_TEMP(fpip, x, ii)->y = 0;
+		for (int i=imin; i<imax; i++) {
+			if ( y+i < 0 || fpip->w <= y+i ) {
+				vskip++;
+			} else {
+				YCP_TEMP(fpip, x, ii)->y = static_cast<short>( YCP_TEMP(fpip, x, ii)->y + YCP_EDIT(fpip, x, y+i)->y );
+			}
 		}
 	}
-	min = locals[local_idx][min_idx];
-	YCP_TEMP(fpip, x, y)->y = (fp->check[1] ? YCP_EDIT(fpip, x, y)->y : get_mean_y(fpip, min, x, y));
-	YCP_TEMP(fpip, x, y)->cb = get_mean_cb(fpip, min, x, y);
-	YCP_TEMP(fpip, x, y)->cr = get_mean_cr(fpip, min, x, y);
+	for (int x=imin; x<fpip->w+imax; x++) {
+		int xx = x-imin;
+		mean_y[ii][xx] = 0;
+		int hskip = 0;
+		for (int j=imin; j<imax; j++) {
+			if ( x+j < 0 || fpip->h <= x+j ) {
+				hskip++;
+			} else {
+				mean_y[ii][xx] += YCP_TEMP(fpip, x+j, ii)->y;
+			}
+		}
+		mean_y[ii][xx] /= static_cast<float>( (RANGE-vskip)*(RANGE-hskip) );
+	}
 }
 
-//(x, y)周り(areas[area_idx])の輝度の分散を返す。
-static int
-get_variance(FILTER *fp, FILTER_PROC_INFO *fpip, int area_idx, int x, int y)
+// x, y の平滑化画素値を ycp_temp にセット
+static void
+set_smoothed(FILTER_PROC_INFO *fpip, int x, int y, int offset)
 {
-	int mean = (fp->check[0] ? YCP_EDIT(fpip, x, y)->y : get_mean_y(fpip, area_idx, x, y));
-	int sum = 0;
-	int i;
-	for (i=0; i<NI; i++) {
-		int temp = areas[area_idx][i];
-		if ( temp == NR ) {
-			break;
-		}
-		temp = YCP_EDIT(fpip, x+rels[temp][0], y+rels[temp][1])->y - mean;
-		sum += temp*temp;
-	}
 	
-	if ( fp->check[0] ) {
-		return sum/i;
-	} else {
-		return sum/(i-1);
-	}
-}
-
-//(x, y)周り(areas[area_idx])の輝度の平均を返す。
-static short
-get_mean_y(FILTER_PROC_INFO *fpip, int area_idx, int x, int y)
-{
-	int sum = 0;
-	int i;
-	for (i=0; i<NI; i++) {
-		int temp = areas[area_idx][i];
-		if (temp==NR) {
-			break;
-		}
-		sum += YCP_EDIT(fpip, x+rels[temp][0], y+rels[temp][1])->y;
-	}
-
-	return static_cast<short>(sum/i);
-}
-
-//(x, y)周り(areas[area_idx])の色差(青)の平均を返す。
-static short
-get_mean_cb(FILTER_PROC_INFO *fpip, int area_idx, int x, int y)
-{
-	int sum = 0;
-	int i;
-	for (i=0; i<NI; i++) {
-		int temp = areas[area_idx][i];
-		if (temp==NR) {
-			break;
-		}
-		sum += YCP_EDIT(fpip, x+rels[temp][0], y+rels[temp][1])->cb;
-	}
-
-	return static_cast<short>(sum/i);
-}
-//(x, y)周り(areas[area_idx])の色差(赤)の平均を返す。
-static short
-get_mean_cr(FILTER_PROC_INFO *fpip, int area_idx, int x, int y)
-{
-	int sum = 0;
-	int i;
-	for (i=0; i<NI; i++) {
-		int temp = areas[area_idx][i];
-		if (temp==NR) {
-			break;
-		}
-		sum += YCP_EDIT(fpip, x+rels[temp][0], y+rels[temp][1])->cr;
-	}
-
-	return static_cast<short>(sum/i);
 }
