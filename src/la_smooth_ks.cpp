@@ -15,14 +15,6 @@ static struct {
 	int range, w;
 } allocated = {0, 0};
 
-#include <stdio.h>
-#define DebugPrint( fmt, ... ) \
-{ \
-char str[256]; \
-sprintf( str, fmt, __VA_ARGS__ ); \
-OutputDebugString( str ); \
-}
-
 //---------------------------------------------------------------------
 //		フィルタ構造体定義
 //---------------------------------------------------------------------
@@ -86,8 +78,27 @@ func_exit(FILTER *fp)
 #define MID_Y 2048.0f
 static int imin, imax;
 
+#define NR 25
+//相対座標リスト
+static const int rels[NR][2] = {
+	{-2, -2}, {-1, -2}, {0, -2}, {1, -2}, {2, -2},
+	{-2, -1}, {-1, -1}, {0, -1}, {1, -1}, {2, -1},
+	{-2, 0}, {-1, 0}, {0, 0}, {1, 0}, {2, 0},
+	{-2, 1}, {-1, 1}, {0, 1}, {1, 1}, {2, 1},
+	{-2, 2}, {-1, 2}, {0, 2}, {1, 2}, {2, 2},
+};
+static const int * const exclusions[3][3][2] = {
+	{{rels[2], rels[10]}, {rels[11], rels[13]}, {rels[2], rels[14]}},
+	{{rels[7], rels[17]}, {nullptr, nullptr}, {rels[7], rels[17]}},
+	{{rels[10], rels[22]}, {rels[11], rels[13]}, {rels[14], rels[22]}}
+};
+
 static void set_mean_var(FILTER_PROC_INFO *fpip, int ii, int y);
-static void set_smoothed(FILTER_PROC_INFO *fpip, int x, int y, int offset);
+static void set_smoothed(FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset);
+static float get_var(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL offcentrize);
+static short get_mean_y(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j);
+static short get_mean_cb(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list);
+static short get_mean_cr(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list);
 
 // 本体
 BOOL
@@ -132,7 +143,7 @@ func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 		int i=RANGE-1;
 		set_mean_var(fpip, PMOD(i+offset, RANGE), y+imax-1);
 		for ( int x=0; x<fpip->w; x++ ) {
-			set_smoothed(fpip, x, y, offset);
+			set_smoothed(fp, fpip, x, y, offset);
 		}
 		offset = PMOD(offset+1, RANGE);
 	}
@@ -212,20 +223,128 @@ set_mean_var(FILTER_PROC_INFO *fpip, int ii, int y)
 
 // x, y の平滑化画素値を ycp_temp にセット
 static void
-set_smoothed(FILTER_PROC_INFO *fpip, int x, int y, int offset)
+set_smoothed(FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset)
 {
-	float min_var = var_y[offset][x];
+	float min_var = get_var(fpip, x, y, offset, 0, 0, fp->check[0]);
 	int min_i=0, min_j=0;
 	for ( int i=0; i<RANGE; i++ ) {
-		int ii = PMOD(i+offset, RANGE);
 		for ( int j=(!i); j<RANGE; j++ ) {
-			if ( var_y[ii][x+j] < min_var ) {
-				min_var = var_y[ii][x+j];
-				min_i = ii;
+			float var = get_var(fpip, x, y, offset, i, j, fp->check[0]);
+			if ( var < min_var ) {
+				min_var = var;
+				min_i = i;
 				min_j = j;
 			}
 		}
 	}
-	YCP_TEMP(fpip, x, y)->y = static_cast<short>( mean_y[min_i][x+min_j] );
+	YCP_TEMP(fpip, x, y)->y = fp->check[1] ? YCP_EDIT(fpip, x, y)-> y : get_mean_y(fpip, x, y, offset, min_i, min_j);
+	YCP_TEMP(fpip, x, y)->cb = get_mean_cb(fpip, x+min_i+imin, y+min_j+imin, exclusions[min_i][min_j]);
+	YCP_TEMP(fpip, x, y)->cr = get_mean_cr(fpip, x+min_i+imin, y+min_j+imin, exclusions[min_i][min_j]);
 }
 
+static float
+get_var(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL offcentrize)
+{
+	int ii = PMOD(i+offset, RANGE);
+	const int * const *list = exclusions[i][j];
+	float ret = var_y[ii][x];
+	float diff=0.0f, d_m=0.0f, d_cnt=0.0f;
+	
+	for ( int k=0; k<2; k++ ) {
+		if ( list[k] != nullptr ) {
+			int xx = x + list[k][0];
+			int yy = y + list[k][1];
+			if ( 0 <= xx && xx < fpip->w && 0 <= yy && yy < fpip->h ) {
+				float temp = mean_y[ii][x+j] - YCP_EDIT(fpip, xx, yy)->y;
+				diff += temp*temp;
+				d_cnt += 1.0f;
+				d_m += YCP_EDIT(fpip, xx, yy)->y;
+			}
+		}
+	}
+	if ( 0.5f < d_cnt ) {
+		float temp = mean_y[ii][x+j] - d_m/d_cnt;
+		// 本当は 9 じゃなくて参照した画素数にしなきゃいけないけど，
+		// 9 じゃないのは端っこだけだし，面倒なので細かいところは無視する
+		ret = (8.0f*ret-diff)/(8.0f-d_cnt)-8.0f*d_cnt*temp*temp/((8.0f-d_cnt)*(8.0f-d_cnt));
+	}
+	if ( offcentrize ) {
+		float temp = mean_y[ii][x+j] - YCP_EDIT(fpip, x, y)->y;
+		ret += temp*temp;
+	}
+	
+	return ret;
+}
+
+static short
+get_mean_y(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j)
+{
+	int ii = PMOD(i+offset, RANGE);
+	const int * const *list = exclusions[i][j];
+	float ret = mean_y[ii][x+j];
+	float d_m=0.0f, d_cnt=0.0f;
+	
+	for ( int k=0; k<2; k++ ) {
+		if ( list[k] != nullptr ) {
+			int xx = x + list[k][0];
+			int yy = y + list[k][1];
+			if ( 0 <= xx && xx < fpip->w && 0 <= yy && yy < fpip->h ) {
+				d_cnt += 1.0f;
+				d_m += YCP_EDIT(fpip, xx, yy)->y;
+			}
+		}
+	}
+	if ( 0.5f < d_cnt ) {
+		// 本当は 9 じゃなくて参照した画素数にしなきゃいけないけど，
+		// 9 じゃないのは端っこだけだし，面倒なので細かいところは無視する
+		ret = (9.0f*ret-d_m)/(9.0f-d_cnt);
+	}
+	
+	return static_cast<short>( ret );
+}
+
+static short
+get_mean_cb(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list)
+{
+	int sum = 0, vskip = 0, hskip=0;
+	for ( int i=imin; i<imax; i++ ) {
+		int yy = y+i;
+		if ( yy < 0 || fpip->h <= yy ) {
+			vskip++;
+			continue;
+		}
+		for ( int j=imin; j<imax; j++ ) {
+			int xx = x+j;
+			if ( xx < 0 || fpip->w <= xx || ( list[0] != nullptr && ( (list[0][0] == i && list[0][1] == j) || (list[1][0] == i && list[1][1] == j) )) ) {
+				hskip++;
+				continue;
+			}
+			sum += YCP_EDIT(fpip, xx, yy)->cb;
+		}
+	}
+	
+	return static_cast<short>( sum / ( (RANGE-vskip)*RANGE-hskip ) );
+}
+
+static short
+get_mean_cr(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list)
+{
+	int sum = 0, vskip = 0, hskip=0;
+	for ( int i=imin; i<imax; i++ ) {
+		int yy = y+i;
+		if ( yy < 0 || fpip->h <= yy ) {
+			vskip++;
+			continue;
+		}
+		for ( int j=imin; j<imax; j++ ) {
+			int xx = x+j;
+			if ( xx < 0 || fpip->w <= xx || ( list[0] != nullptr && ( (list[0][0] == i && list[0][1] == j) || (list[1][0] == i && list[1][1] == j) )) ) {
+				hskip++;
+				continue;
+			}
+			sum += YCP_EDIT(fpip, xx, yy)->cr;
+		}
+	}
+	
+	return static_cast<short>( sum / ( (RANGE-vskip)*RANGE-hskip ) );
+}
