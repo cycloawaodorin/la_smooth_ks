@@ -100,11 +100,35 @@ static short get_mean_y(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i,
 static short get_mean_cb(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list);
 static short get_mean_cr(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list);
 
+#include <stdio.h>
+#define DebugPrint( fmt, ... ) \
+{ \
+char str[256]; \
+sprintf( str, fmt, __VA_ARGS__ ); \
+OutputDebugString( str ); \
+}
+static void
+set_test(FILTER_PROC_INFO *fpip)
+{
+#define N 10
+	fpip->h = N;
+	fpip->w = N;
+	for ( int i=0; i<N; i++ ) {
+		for ( int j=0; j<N; j++ ) {
+			if ( i < j ) {
+				YCP_EDIT(fpip, i, j)->y = 4096;
+			} else {
+				YCP_EDIT(fpip, i, j)->y = 0;
+			}
+		}
+	}
+}
+
 // 本体
 BOOL
 func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 {
-
+	set_test(fpip);
 	if ( fpip->h < (RANGE*2-1) || fpip->w < (RANGE*2-1) ) {
 		OutputDebugString("The image width or height is too small for the range.");
 		return FALSE;
@@ -182,7 +206,9 @@ set_mean_var(FILTER_PROC_INFO *fpip, int ii, int y)
 				mean_y[ii][xx] += temp_y[x+j];
 			}
 		}
-		mean_y[ii][xx] /= static_cast<float>( (RANGE-vskip)*(RANGE-hskip) );
+		if ( (RANGE-vskip)*(RANGE-hskip) != 0 ) {
+			mean_y[ii][xx] /= static_cast<float>( (RANGE-vskip)*(RANGE-hskip) );
+		}
 	}
 	
 	// 輝度の分散
@@ -266,6 +292,9 @@ get_var(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL off
 		float temp = mean_y[ii][x+j] - d_m/d_cnt;
 		// 本当は 9 じゃなくて参照した画素数にしなきゃいけないけど，
 		// 9 じゃないのは端っこだけだし，面倒なので細かいところは無視する
+		if ( x==2 && y==5 ) {
+			DebugPrint("%.3g %.3g", ret, diff);
+		}
 		ret = (8.0f*ret-diff)/(8.0f-d_cnt)-8.0f*d_cnt*temp*temp/((8.0f-d_cnt)*(8.0f-d_cnt));
 	}
 	if ( offcentrize ) {
