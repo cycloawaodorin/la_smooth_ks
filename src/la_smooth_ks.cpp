@@ -23,7 +23,6 @@ sprintf( str, fmt, __VA_ARGS__ ); \
 OutputDebugString( str ); \
 }
 
-
 //---------------------------------------------------------------------
 //		フィルタ構造体定義
 //---------------------------------------------------------------------
@@ -128,9 +127,10 @@ func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 	for ( int i=imin; i<imax-1; i++ ) {
 		set_mean_var(fpip, PMOD(i+offset, RANGE), i);
 	}
+	offset = 0;
 	for ( int y=0; y<fpip->h; y++ ) {
-		int i=imax-1;
-		set_mean_var(fpip, PMOD(i+offset, RANGE), y+i);
+		int i=RANGE-1;
+		set_mean_var(fpip, PMOD(i+offset, RANGE), y+imax-1);
 		for ( int x=0; x<fpip->w; x++ ) {
 			set_smoothed(fpip, x, y, offset);
 		}
@@ -193,7 +193,7 @@ set_mean_var(FILTER_PROC_INFO *fpip, int ii, int y)
 		var_y[ii][xx] = 0;
 		int hskip = 0;
 		for ( int j=imin; j<imax; j++ ) {
-			if ( x+j < 0 || fpip->h <= x+j ) {
+			if ( x+j < 0 || fpip->w <= x+j ) {
 				hskip++;
 			}  else {
 				var_y[ii][xx] += temp_y[x+j];
@@ -219,7 +219,7 @@ set_smoothed(FILTER_PROC_INFO *fpip, int x, int y, int offset)
 	for ( int i=0; i<RANGE; i++ ) {
 		int ii = PMOD(i+offset, RANGE);
 		for ( int j=(!i); j<RANGE; j++ ) {
-			if ( var_y[ii][x+i] < min_var ) {
+			if ( var_y[ii][x+j] < min_var ) {
 				min_var = var_y[ii][x+j];
 				min_i = ii;
 				min_j = j;
@@ -228,3 +228,4 @@ set_smoothed(FILTER_PROC_INFO *fpip, int x, int y, int offset)
 	}
 	YCP_TEMP(fpip, x, y)->y = static_cast<short>( mean_y[min_i][x+min_j] );
 }
+
