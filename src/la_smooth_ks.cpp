@@ -230,7 +230,7 @@ set_mean_var(FILTER_PROC_INFO *fpip, int ii, int y)
 		var_y[ii][xx] = 0;
 		int hskip = 0;
 		for ( int j=imin; j<imax; j++ ) {
-			if ( x+j < 0 || fpip->w <= x+j ) {
+			if ( x+j < 0 || fpip->h <= x+j ) {
 				hskip++;
 			}  else {
 				var_y[ii][xx] += temp_y[x+j];
@@ -273,7 +273,7 @@ get_var(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL off
 {
 	int ii = PMOD(i+offset, RANGE);
 	const int * const *list = exclusions[i][j];
-	float ret = var_y[ii][x];
+	float ret = var_y[ii][x+j];
 	float diff=0.0f, d_m=0.0f, d_cnt=0.0f;
 	
 	for ( int k=0; k<2; k++ ) {
@@ -292,9 +292,6 @@ get_var(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL off
 		float temp = mean_y[ii][x+j] - d_m/d_cnt;
 		// 本当は 9 じゃなくて参照した画素数にしなきゃいけないけど，
 		// 9 じゃないのは端っこだけだし，面倒なので細かいところは無視する
-		if ( x==2 && y==5 ) {
-			DebugPrint("%.3g %.3g", ret, diff);
-		}
 		ret = (8.0f*ret-diff)/(8.0f-d_cnt)-8.0f*d_cnt*temp*temp/((8.0f-d_cnt)*(8.0f-d_cnt));
 	}
 	if ( offcentrize ) {
