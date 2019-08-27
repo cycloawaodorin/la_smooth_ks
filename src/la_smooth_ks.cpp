@@ -259,15 +259,15 @@ get_var(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL off
 				float temp = mean_y[ii][x+j] - YCP_EDIT(fpip, xx, yy)->y;
 				diff += temp*temp;
 				d_cnt += 1.0f;
-				d_m += YCP_EDIT(fpip, xx, yy)->y;
+				d_m += temp;
 			}
 		}
 	}
 	if ( 0.5f < d_cnt ) {
-		float temp = mean_y[ii][x+j] - d_m/d_cnt;
 		// 本当は 9 じゃなくて参照した画素数にしなきゃいけないけど，
 		// 9 じゃないのは端っこだけだし，面倒なので細かいところは無視する
-		ret = (8.0f*ret-diff*(d_cnt-1.0f)/d_cnt-9.0f*d_cnt*temp*temp/(9.0f-d_cnt))/(8.0f-d_cnt);
+		float temp = d_m/(9.0f-d_cnt);
+		ret = (8.0f*ret-diff)/(8.0f-d_cnt)-temp*temp;
 	}
 	if ( offcentrize ) {
 		float temp = mean_y[ii][x+j] - YCP_EDIT(fpip, x, y)->y;
