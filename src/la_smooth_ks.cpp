@@ -135,16 +135,15 @@ func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 	imax = imin + RANGE;
 	int offset = -imin;
 	for ( int i=imin; i<imax-1; i++ ) {
-		set_mean_var(fpip, PMOD(i+offset, RANGE), i);
+		set_mean_var(fpip, (i+offset)%(RANGE), i);
 	}
 	offset = 0;
 	for ( int y=0; y<fpip->h; y++ ) {
-		int i=RANGE-1;
-		set_mean_var(fpip, PMOD(i+offset, RANGE), y+imax-1);
+		set_mean_var(fpip, (RANGE-1+offset)%RANGE, y+imax-1);
 		for ( int x=0; x<fpip->w; x++ ) {
 			set_smoothed(fp, fpip, x, y, offset);
 		}
-		offset = PMOD(offset+1, RANGE);
+		offset = (offset+1)%RANGE;
 	}
 
 	PIXEL_YC *swap = fpip->ycp_edit;
@@ -246,7 +245,7 @@ set_smoothed(const FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset)
 static float
 get_var(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL offcentrize)
 {
-	int ii = PMOD(i+offset, RANGE);
+	int ii = (i+offset)%RANGE;
 	const int * const *list = exclusions[i][j];
 	float ret = var_y[ii][x+j];
 	float diff=0.0f, d_m=0.0f, d_cnt=0.0f;
@@ -280,7 +279,7 @@ get_var(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BO
 static short
 get_mean_y(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j)
 {
-	int ii = PMOD(i+offset, RANGE);
+	int ii = (i+offset)%RANGE;
 	const int * const *list = exclusions[i][j];
 	float ret = mean_y[ii][x+j];
 	float d_m=0.0f, d_cnt=0.0f;
