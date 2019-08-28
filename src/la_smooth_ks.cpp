@@ -93,12 +93,12 @@ static const int * const exclusions[3][3][2] = {
 	{{rels[10], rels[22]}, {rels[11], rels[13]}, {rels[14], rels[22]}}
 };
 
-static void set_mean_var(FILTER_PROC_INFO *fpip, int ii, int y);
-static void set_smoothed(FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset);
-static float get_var(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL offcentrize);
-static short get_mean_y(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j);
-static short get_mean_cb(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list);
-static short get_mean_cr(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list);
+static void set_mean_var(const FILTER_PROC_INFO *fpip, int ii, int y);
+static void set_smoothed(const FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset);
+static float get_var(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL offcentrize);
+static short get_mean_y(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j);
+static short get_mean_cb(const FILTER_PROC_INFO *fpip, int x, int y, const int * const *list);
+static short get_mean_cr(const FILTER_PROC_INFO *fpip, int x, int y, const int * const *list);
 
 // 本体
 BOOL
@@ -156,7 +156,7 @@ func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 
 // すべての x について，y を中心とした mean_y, var_y を i にセット
 static void
-set_mean_var(FILTER_PROC_INFO *fpip, int ii, int y)
+set_mean_var(const FILTER_PROC_INFO *fpip, int ii, int y)
 {
 	// 輝度の平均
 	int vskip = 0;
@@ -224,7 +224,7 @@ set_mean_var(FILTER_PROC_INFO *fpip, int ii, int y)
 
 // x, y の平滑化画素値を ycp_temp にセット
 static void
-set_smoothed(FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset)
+set_smoothed(const FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset)
 {
 	float min_var = get_var(fpip, x, y, offset, 0, 0, fp->check[0]);
 	int min_i=0, min_j=0;
@@ -244,7 +244,7 @@ set_smoothed(FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset)
 }
 
 static float
-get_var(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL offcentrize)
+get_var(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL offcentrize)
 {
 	int ii = PMOD(i+offset, RANGE);
 	const int * const *list = exclusions[i][j];
@@ -278,7 +278,7 @@ get_var(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL off
 }
 
 static short
-get_mean_y(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j)
+get_mean_y(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j)
 {
 	int ii = PMOD(i+offset, RANGE);
 	const int * const *list = exclusions[i][j];
@@ -305,7 +305,7 @@ get_mean_y(FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j)
 }
 
 static short
-get_mean_cb(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list)
+get_mean_cb(const FILTER_PROC_INFO *fpip, int x, int y, const int * const *list)
 {
 	int sum = 0, vskip = 0, hskip=0;
 	for ( int i=imin; i<imax; i++ ) {
@@ -328,7 +328,7 @@ get_mean_cb(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list)
 }
 
 static short
-get_mean_cr(FILTER_PROC_INFO *fpip, int x, int y, const int * const *list)
+get_mean_cr(const FILTER_PROC_INFO *fpip, int x, int y, const int * const *list)
 {
 	int sum = 0, vskip = 0, hskip=0;
 	for ( int i=imin; i<imax; i++ ) {
