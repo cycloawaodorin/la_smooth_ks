@@ -2,4 +2,3 @@ LIBRARY la_smooth_ks
 
 EXPORTS
 	GetFilterTable @1
-

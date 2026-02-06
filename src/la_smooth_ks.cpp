@@ -1,13 +1,12 @@
-//----------------------------------------------------------------------------------
-//		‹ÇŠ—Ìˆæ‘I‘ğE•½‹Ï‰»ƒtƒBƒ‹ƒ^
+ï»¿//----------------------------------------------------------------------------------
+//		å±€æ‰€é ˜åŸŸé¸æŠãƒ»å¹³å‡åŒ–ãƒ•ã‚£ãƒ«ã‚¿
 //----------------------------------------------------------------------------------
 #include <windows.h>
-#include <stdlib.h>
-#include <limits.h>
-#include "filter.h"
-#include "version.h"
+#include <string>
+#include "filter.hpp"
+#include "version.hpp"
 
-#define RANGE 3
+constexpr static int RANGE = 3;
 static int *mean_y[RANGE] = {nullptr, nullptr, nullptr};
 static int *var_y[RANGE] = {nullptr, nullptr, nullptr};
 static int *temp_y = nullptr;
@@ -15,46 +14,53 @@ static struct {
 	int range, w;
 } allocated = {0, 0};
 
-//---------------------------------------------------------------------
-//		ƒtƒBƒ‹ƒ^\‘¢‘Ì’è‹`
-//---------------------------------------------------------------------
-#define CHECK_N 2
-static TCHAR check_name0[] = "’–Ú“_’†S2Ÿƒ‚[ƒƒ“ƒg‚Å—Ìˆæ‚ğ‘I‘ğ";
-static TCHAR check_name1[] = "F·‚Ì‚İ•½‹Ï‰»";
-static TCHAR *check_name[CHECK_N] = {check_name0, check_name1};
-static int check_default[CHECK_N]  = {0, 0};
-#define FILTER_NAME "‹ÇŠ—Ìˆæ‘I‘ğE•½‹Ï‰»ƒtƒBƒ‹ƒ^"
-static TCHAR filter_name[] = FILTER_NAME;
-static TCHAR filter_information[] = FILTER_NAME " " VERSION " by KAZOON";
-
-FILTER_DLL filter = {
-	FILTER_FLAG_EX_INFORMATION,
-	0, 0, // İ’èƒEƒBƒ“ƒhƒEƒTƒCƒY - İ’è‚µ‚È‚¢
-	filter_name,
-	0, // ƒgƒ‰ƒbƒNƒo[‚Ì”
-	NULL, NULL, NULL, NULL, // ‚»‚Ì‘¼ƒgƒ‰ƒbƒNƒo[ŠÖ˜A
-	CHECK_N,
-	check_name,
-	check_default,
-	func_proc,
-	NULL, // func_init
-	func_exit,
-	NULL, NULL, NULL, NULL, NULL, 0,
-	filter_information,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	0, 0 // reserve
-};
-
-EXTERN_C FILTER_DLL __declspec(dllexport) * __stdcall
-GetFilterTable(void)
+static std::string
+Utf16ToCp932(const std::wstring &utf16)
 {
+	if (utf16.empty()) return "";
+	auto size = WideCharToMultiByte(932, 0, utf16.c_str(), -1, nullptr, 0, nullptr, nullptr);
+	std::string str(size - 1, '\0');
+	WideCharToMultiByte(932, 0, utf16.c_str(), -1, str.data(), size, nullptr, nullptr);
+	return str;
+}
+
+//---------------------------------------------------------------------
+//		ãƒ•ã‚£ãƒ«ã‚¿æ§‹é€ ä½“å®šç¾©
+//---------------------------------------------------------------------
+#define FILTER_NAME L"å±€æ‰€é ˜åŸŸé¸æŠãƒ»å¹³å‡åŒ–ãƒ•ã‚£ãƒ«ã‚¿"
+
+EXTERN_C FILTER_DLL *
+GetFilterTable()
+{
+	constexpr static const auto CHECK_N = 2;
+	static const std::wstring check_name0 = L"æ³¨ç›®ç‚¹ä¸­å¿ƒ2æ¬¡ãƒ¢ãƒ¼ãƒ¡ãƒ³ãƒˆã§é ˜åŸŸã‚’é¸æŠ";
+	static const std::wstring check_name1 = L"è‰²å·®ã®ã¿å¹³å‡åŒ–";
+	static TCHAR *check_name[CHECK_N] = {const_cast<TCHAR *>(Utf16ToCp932(check_name0).c_str()), const_cast<TCHAR *>(Utf16ToCp932(check_name1).c_str())};
+	static int check_default[CHECK_N]  = {0, 0};
+	static FILTER_DLL filter = {
+		FILTER_FLAG_EX_INFORMATION,
+		0, 0, // è¨­å®šã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã‚µã‚¤ã‚º - è¨­å®šã—ãªã„
+		const_cast<TCHAR *>(Utf16ToCp932(FILTER_NAME).c_str()),
+		0, // ãƒˆãƒ©ãƒƒã‚¯ãƒãƒ¼ã®æ•°
+		nullptr, nullptr, nullptr, nullptr, // ãã®ä»–ãƒˆãƒ©ãƒƒã‚¯ãƒãƒ¼é–¢é€£
+		CHECK_N,
+		check_name,
+		check_default,
+		func_proc,
+		nullptr, // func_init
+		func_exit,
+		nullptr, nullptr, nullptr, nullptr, nullptr, 0,
+		const_cast<TCHAR *>(Utf16ToCp932(FILTER_NAME L" " VERSION L" by KAZOON").c_str()),
+		nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+		0, 0 // reserve
+	};
 	return &filter;
 }
 
 BOOL
 func_exit(FILTER *fp)
 {
-	for ( int i=0; i<allocated.range; i++ ) {
+	for ( auto i=0; i<allocated.range; i++ ) {
 		free(mean_y[i]);
 		mean_y[i] = nullptr;
 		free(var_y[i]);
@@ -69,18 +75,33 @@ func_exit(FILTER *fp)
 }
 
 //---------------------------------------------------------------------
-//		ƒtƒBƒ‹ƒ^ˆ—ŠÖ”
+//		ãƒ•ã‚£ãƒ«ã‚¿å‡¦ç†é–¢æ•°
 //---------------------------------------------------------------------
-#define YCP_EDIT(fpip, x, y) ((fpip)->ycp_edit+(x)+(fpip)->max_w*(y))
-#define YCP_TEMP(fpip, x, y) ((fpip)->ycp_temp+(x)+(fpip)->max_w*(y))
-#define PMOD(a, b) ( ((a)<(b)) ? (a) : ((a)-(b)) )
+static PIXEL_YC*
+ycp_edit(const FILTER_PROC_INFO *fpip, auto x, auto y)
+{
+	return fpip->ycp_edit+(x+fpip->max_w*y);
+}
+static PIXEL_YC*
+ycp_temp(const FILTER_PROC_INFO *fpip, auto x, auto y)
+{
+	return fpip->ycp_temp+(x+fpip->max_w*y);
+}
+static auto
+pmod(auto a, auto b)
+{
+	if ( a < b ) {
+		return a;
+	} else {
+		return a-b;
+	}
+}
 
-#define MID_Y 2048
-#define IMIN (-1)
-#define IMAX 2
-
-#define NR 25
-//‘Š‘ÎÀ•WƒŠƒXƒg
+constexpr static const short MID_Y = 2048;
+constexpr static const int IMIN = -1;
+constexpr static const int IMAX = 2;
+constexpr static const int NR = 25;
+//ç›¸å¯¾åº§æ¨™ãƒªã‚¹ãƒˆ
 static const int rels[NR][2] = {
 	{-2, -2}, {-1, -2}, {0, -2}, {1, -2}, {2, -2},
 	{-2, -1}, {-1, -1}, {0, -1}, {1, -1}, {2, -1},
@@ -94,14 +115,14 @@ static const int * const exclusions[3][3][2] = {
 	{{rels[10], rels[22]}, {rels[11], rels[13]}, {rels[14], rels[22]}}
 };
 
-static void set_mean_var(const FILTER_PROC_INFO *fpip, int ii, int y);
-static void set_smoothed(const FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset);
-static int get_var(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL offcentrize);
-static short get_mean_y(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j);
-static short get_mean_cb(const FILTER_PROC_INFO *fpip, int x, int y, const int * const *list);
-static short get_mean_cr(const FILTER_PROC_INFO *fpip, int x, int y, const int * const *list);
+static void set_mean_var(const FILTER_PROC_INFO *fpip, auto ii, auto y);
+static void set_smoothed(const FILTER *fp, FILTER_PROC_INFO *fpip, auto x, auto y, auto offset);
+static auto get_var(const FILTER_PROC_INFO *fpip, auto x, auto y, auto offset, auto i, auto j, auto offcentrize);
+static short get_mean_y(const FILTER_PROC_INFO *fpip, auto x, auto y, auto offset, auto i, auto j);
+static short get_mean_cb(const FILTER_PROC_INFO *fpip, auto x, auto y, const int * const *list);
+static short get_mean_cr(const FILTER_PROC_INFO *fpip, auto x, auto y, const int * const *list);
 
-// –{‘Ì
+// æœ¬ä½“
 BOOL
 func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 {
@@ -113,36 +134,36 @@ func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 		func_exit(fp);
 		allocated.range = RANGE;
 		allocated.w = fpip->w;
-		for ( int i=0; i<RANGE; i++ ) {
-			mean_y[i] = static_cast<int *>( malloc(sizeof(int)*static_cast<size_t>(fpip->w+RANGE)) );
+		for ( auto i=0; i<RANGE; i++ ) {
+			mean_y[i] = static_cast<int *>( calloc(fpip->w+RANGE, sizeof(int)) );
 			if ( mean_y[i] == nullptr ) {
 				OutputDebugString("Memory allocation failed.");
 				return FALSE;
 			}
-			var_y[i] = static_cast<int *>( malloc(sizeof(int)*static_cast<size_t>(fpip->w+RANGE)) );
+			var_y[i] = static_cast<int *>( calloc(fpip->w+RANGE, sizeof(int)) );
 			if ( var_y[i] == nullptr ) {
 				OutputDebugString("Memory allocation failed.");
 				return FALSE;
 			}
 		}
-		temp_y = static_cast<int *>( malloc(sizeof(int)*fpip->w) );
+		temp_y = static_cast<int *>( calloc(fpip->w, sizeof(int)) );
 		if ( temp_y == nullptr ) {
 			OutputDebugString("Memory allocation failed.");
 			return FALSE;
 		}
 	}
 	
-	int offset = -IMIN;
-	for ( int i=IMIN; i<IMAX-1; i++ ) {
-		set_mean_var(fpip, PMOD(i+offset, RANGE), i);
+	auto offset = -IMIN;
+	for ( auto i=IMIN; i<IMAX-1; i++ ) {
+		set_mean_var(fpip, pmod(i+offset, RANGE), i);
 	}
 	offset = 0;
-	for ( int y=0; y<fpip->h; y++ ) {
-		set_mean_var(fpip, PMOD(RANGE-1+offset, RANGE), y+IMAX-1);
-		for ( int x=0; x<fpip->w; x++ ) {
+	for ( auto y=0; y<fpip->h; y++ ) {
+		set_mean_var(fpip, pmod(RANGE-1+offset, RANGE), y+IMAX-1);
+		for ( auto x=0; x<fpip->w; x++ ) {
 			set_smoothed(fp, fpip, x, y, offset);
 		}
-		offset = PMOD(offset+1, RANGE);
+		offset = pmod(offset+1, RANGE);
 	}
 
 	PIXEL_YC *swap = fpip->ycp_edit;
@@ -152,27 +173,27 @@ func_proc(FILTER *fp, FILTER_PROC_INFO *fpip)
 	return TRUE;
 }
 
-// ‚·‚×‚Ä‚Ì x ‚É‚Â‚¢‚ÄCy ‚ğ’†S‚Æ‚µ‚½ mean_y, var_y ‚ğ i ‚ÉƒZƒbƒg
+// ã™ã¹ã¦ã® x ã«ã¤ã„ã¦ï¼Œy ã‚’ä¸­å¿ƒã¨ã—ãŸ mean_y, var_y ã‚’ i ã«ã‚»ãƒƒãƒˆ
 static void
-set_mean_var(const FILTER_PROC_INFO *fpip, int ii, int y)
+set_mean_var(const FILTER_PROC_INFO *fpip, auto ii, auto y)
 {
-	// ‹P“x‚Ì•½‹Ï
-	int vskip = 0;
-	for ( int x=0; x<fpip->w; x++ ) {
+	// è¼åº¦ã®å¹³å‡
+	auto vskip = 0;
+	for ( auto x=0; x<fpip->w; x++ ) {
 		temp_y[x] = 0;
-		for ( int i=IMIN; i<IMAX; i++ ) {
+		for ( auto i=IMIN; i<IMAX; i++ ) {
 			if ( y+i < 0 || fpip->h <= y+i ) {
 				vskip++;
 			} else {
-				temp_y[x] += YCP_EDIT(fpip, x, y+i)->y;
+				temp_y[x] += ycp_edit(fpip, x, y+i)->y;
 			}
 		}
 	}
-	for ( int x=IMIN; x<fpip->w+IMAX; x++ ) {
-		int xx = x-IMIN;
+	for ( auto x=IMIN; x<fpip->w+IMAX; x++ ) {
+		auto xx = x-IMIN;
 		mean_y[ii][xx] = 0;
-		int hskip = 0;
-		for ( int j=IMIN; j<IMAX; j++ ) {
+		auto hskip = 0;
+		for ( auto j=IMIN; j<IMAX; j++ ) {
 			if ( x+j < 0 || fpip->w <= x+j ) {
 				hskip++;
 			} else {
@@ -184,51 +205,51 @@ set_mean_var(const FILTER_PROC_INFO *fpip, int ii, int y)
 		}
 	}
 	
-	// ‹P“x‚Ì•ªU
-	for ( int x=0; x<fpip->w; x++ ) {
+	// è¼åº¦ã®åˆ†æ•£
+	for ( auto x=0; x<fpip->w; x++ ) {
 		temp_y[x] = 0;
-		for ( int i=IMIN; i<IMAX; i++ ) {
+		for ( auto i=IMIN; i<IMAX; i++ ) {
 			if ( y+i < 0 ) {
 				continue;
 			} else if ( fpip->w <= y+i ) {
 				break;
 			} else {
-				int temp = YCP_EDIT(fpip, x, y+i)->y - MID_Y;
+				auto temp = ycp_edit(fpip, x, y+i)->y - MID_Y;
 				temp_y[x] += temp*temp;
 			}
 		}
 	}
-	for ( int x=IMIN; x<fpip->w+IMAX; x++ ) {
-		int xx = x-IMIN;
+	for ( auto x=IMIN; x<fpip->w+IMAX; x++ ) {
+		auto xx = x-IMIN;
 		var_y[ii][xx] = 0;
-		int hskip = 0;
-		for ( int j=IMIN; j<IMAX; j++ ) {
+		auto hskip = 0;
+		for ( auto j=IMIN; j<IMAX; j++ ) {
 			if ( x+j < 0 || fpip->w <= x+j ) {
 				hskip++;
 			}  else {
 				var_y[ii][xx] += temp_y[x+j];
 			}
 		}
-		int den = (RANGE-vskip)*(RANGE-hskip);
+		auto den = (RANGE-vskip)*(RANGE-hskip);
 		if ( den < 2 ) {
 			var_y[ii][xx] = INT_MAX;
 		} else {
 			var_y[ii][xx] /= den-1;
 		}
-		int temp = mean_y[ii][xx]-MID_Y;
+		auto temp = mean_y[ii][xx]-MID_Y;
 		var_y[ii][xx] -= temp*temp*den/(den-1);
 	}
 }
 
-// x, y ‚Ì•½ŠŠ‰»‰æ‘f’l‚ğ ycp_temp ‚ÉƒZƒbƒg
+// x, y ã®å¹³æ»‘åŒ–ç”»ç´ å€¤ã‚’ ycp_temp ã«ã‚»ãƒƒãƒˆ
 static void
-set_smoothed(const FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset)
+set_smoothed(const FILTER *fp, FILTER_PROC_INFO *fpip, auto x, auto y, auto offset)
 {
-	int min_var = get_var(fpip, x, y, offset, 0, 0, fp->check[0]);
-	int min_i=0, min_j=0;
-	for ( int i=0; i<RANGE; i++ ) {
-		for ( int j=(!i); j<RANGE; j++ ) {
-			int var = get_var(fpip, x, y, offset, i, j, fp->check[0]);
+	auto min_var = get_var(fpip, x, y, offset, 0, 0, fp->check[0]);
+	auto min_i=0, min_j=0;
+	for ( auto i=0; i<RANGE; i++ ) {
+		for ( auto j=(i==0 ? 1 : 0); j<RANGE; j++ ) {
+			auto var = get_var(fpip, x, y, offset, i, j, fp->check[0]);
 			if ( var < min_var ) {
 				min_var = var;
 				min_i = i;
@@ -236,25 +257,25 @@ set_smoothed(const FILTER *fp, FILTER_PROC_INFO *fpip, int x, int y, int offset)
 			}
 		}
 	}
-	YCP_TEMP(fpip, x, y)->y = fp->check[1] ? YCP_EDIT(fpip, x, y)-> y : get_mean_y(fpip, x, y, offset, min_i, min_j);
-	YCP_TEMP(fpip, x, y)->cb = get_mean_cb(fpip, x+min_i+IMIN, y+min_j+IMIN, exclusions[min_i][min_j]);
-	YCP_TEMP(fpip, x, y)->cr = get_mean_cr(fpip, x+min_i+IMIN, y+min_j+IMIN, exclusions[min_i][min_j]);
+	ycp_temp(fpip, x, y)->y = fp->check[1] ? ycp_edit(fpip, x, y)-> y : get_mean_y(fpip, x, y, offset, min_i, min_j);
+	ycp_temp(fpip, x, y)->cb = get_mean_cb(fpip, x+min_i+IMIN, y+min_j+IMIN, exclusions[min_i][min_j]);
+	ycp_temp(fpip, x, y)->cr = get_mean_cr(fpip, x+min_i+IMIN, y+min_j+IMIN, exclusions[min_i][min_j]);
 }
 
-static int
-get_var(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BOOL offcentrize)
+static auto
+get_var(const FILTER_PROC_INFO *fpip, auto x, auto y, auto offset, auto i, auto j, auto offcentrize)
 {
-	int ii = PMOD(i+offset, RANGE);
+	auto ii = pmod(i+offset, RANGE);
 	const int * const *list = exclusions[i][j];
-	int ret = var_y[ii][x+j];
-	int diff=0, d_m=0, d_cnt=0;
+	auto ret = var_y[ii][x+j];
+	auto diff=0, d_m=0, d_cnt=0;
 	
-	for ( int k=0; k<2; k++ ) {
+	for ( auto k=0; k<2; k++ ) {
 		if ( list[k] != nullptr ) {
-			int xx = x + list[k][0];
-			int yy = y + list[k][1];
+			auto xx = x + list[k][0];
+			auto yy = y + list[k][1];
 			if ( 0 <= xx && xx < fpip->w && 0 <= yy && yy < fpip->h ) {
-				int temp = mean_y[ii][x+j] - YCP_EDIT(fpip, xx, yy)->y;
+				auto temp = mean_y[ii][x+j] - ycp_edit(fpip, xx, yy)->y;
 				diff += temp*temp;
 				d_cnt += 1;
 				d_m += temp;
@@ -262,13 +283,13 @@ get_var(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BO
 		}
 	}
 	if ( 0 < d_cnt ) {
-		// –{“–‚Í 9 ‚¶‚á‚È‚­‚ÄQÆ‚µ‚½‰æ‘f”‚É‚µ‚È‚«‚á‚¢‚¯‚È‚¢‚¯‚ÇC
-		// 9 ‚¶‚á‚È‚¢‚Ì‚Í’[‚Á‚±‚¾‚¯‚¾‚µC–Ê“|‚È‚Ì‚Å×‚©‚¢‚Æ‚±‚ë‚Í–³‹‚·‚é
-		int temp = d_m/(9-d_cnt);
+		// æœ¬å½“ã¯ 9 ã˜ã‚ƒãªãã¦å‚ç…§ã—ãŸç”»ç´ æ•°ã«ã—ãªãã‚ƒã„ã‘ãªã„ã‘ã©ï¼Œ
+		// 9 ã˜ã‚ƒãªã„ã®ã¯ç«¯ã£ã“ã ã‘ã ã—ï¼Œé¢å€’ãªã®ã§ç´°ã‹ã„ã¨ã“ã‚ã¯ç„¡è¦–ã™ã‚‹
+		auto temp = d_m/(9-d_cnt);
 		ret = (8*ret-diff)/(8-d_cnt)-temp*temp;
 	}
 	if ( offcentrize ) {
-		int temp = mean_y[ii][x+j] - YCP_EDIT(fpip, x, y)->y;
+		auto temp = mean_y[ii][x+j] - ycp_edit(fpip, x, y)->y;
 		ret += temp*temp;
 	}
 	
@@ -276,26 +297,26 @@ get_var(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j, BO
 }
 
 static short
-get_mean_y(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j)
+get_mean_y(const FILTER_PROC_INFO *fpip, auto x, auto y, auto offset, auto i, auto j)
 {
-	int ii = PMOD(i+offset, RANGE);
+	auto ii = pmod(i+offset, RANGE);
 	const int * const *list = exclusions[i][j];
-	int ret = mean_y[ii][x+j];
-	int d_m=0, d_cnt=0;
+	auto ret = mean_y[ii][x+j];
+	auto d_m=0, d_cnt=0;
 	
-	for ( int k=0; k<2; k++ ) {
+	for ( auto k=0; k<2; k++ ) {
 		if ( list[k] != nullptr ) {
-			int xx = x + list[k][0];
-			int yy = y + list[k][1];
+			auto xx = x + list[k][0];
+			auto yy = y + list[k][1];
 			if ( 0 <= xx && xx < fpip->w && 0 <= yy && yy < fpip->h ) {
 				d_cnt += 1;
-				d_m += YCP_EDIT(fpip, xx, yy)->y;
+				d_m += ycp_edit(fpip, xx, yy)->y;
 			}
 		}
 	}
 	if ( 0 < d_cnt ) {
-		// –{“–‚Í 9 ‚¶‚á‚È‚­‚ÄQÆ‚µ‚½‰æ‘f”‚É‚µ‚È‚«‚á‚¢‚¯‚È‚¢‚¯‚ÇC
-		// 9 ‚¶‚á‚È‚¢‚Ì‚Í’[‚Á‚±‚¾‚¯‚¾‚µC–Ê“|‚È‚Ì‚Å×‚©‚¢‚Æ‚±‚ë‚Í–³‹‚·‚é
+		// æœ¬å½“ã¯ 9 ã˜ã‚ƒãªãã¦å‚ç…§ã—ãŸç”»ç´ æ•°ã«ã—ãªãã‚ƒã„ã‘ãªã„ã‘ã©ï¼Œ
+		// 9 ã˜ã‚ƒãªã„ã®ã¯ç«¯ã£ã“ã ã‘ã ã—ï¼Œé¢å€’ãªã®ã§ç´°ã‹ã„ã¨ã“ã‚ã¯ç„¡è¦–ã™ã‚‹
 		ret = (9*ret-d_m)/(9-d_cnt);
 	}
 	
@@ -303,22 +324,22 @@ get_mean_y(const FILTER_PROC_INFO *fpip, int x, int y, int offset, int i, int j)
 }
 
 static short
-get_mean_cb(const FILTER_PROC_INFO *fpip, int x, int y, const int * const *list)
+get_mean_cb(const FILTER_PROC_INFO *fpip, auto x, auto y, const int * const *list)
 {
-	int sum = 0, vskip = 0, hskip=0;
-	for ( int i=IMIN; i<IMAX; i++ ) {
-		int yy = y+i;
+	auto sum = 0, vskip = 0, hskip=0;
+	for ( auto i=IMIN; i<IMAX; i++ ) {
+		auto yy = y+i;
 		if ( yy < 0 || fpip->h <= yy ) {
 			vskip++;
 			continue;
 		}
-		for ( int j=IMIN; j<IMAX; j++ ) {
-			int xx = x+j;
+		for ( auto j=IMIN; j<IMAX; j++ ) {
+			auto xx = x+j;
 			if ( xx < 0 || fpip->w <= xx || ( list[0] != nullptr && ( (list[0][0] == i && list[0][1] == j) || (list[1][0] == i && list[1][1] == j) )) ) {
 				hskip++;
 				continue;
 			}
-			sum += YCP_EDIT(fpip, xx, yy)->cb;
+			sum += ycp_edit(fpip, xx, yy)->cb;
 		}
 	}
 	
@@ -326,22 +347,22 @@ get_mean_cb(const FILTER_PROC_INFO *fpip, int x, int y, const int * const *list)
 }
 
 static short
-get_mean_cr(const FILTER_PROC_INFO *fpip, int x, int y, const int * const *list)
+get_mean_cr(const FILTER_PROC_INFO *fpip, auto x, auto y, const int * const *list)
 {
-	int sum = 0, vskip = 0, hskip=0;
-	for ( int i=IMIN; i<IMAX; i++ ) {
-		int yy = y+i;
+	auto sum = 0, vskip = 0, hskip=0;
+	for ( auto i=IMIN; i<IMAX; i++ ) {
+		auto yy = y+i;
 		if ( yy < 0 || fpip->h <= yy ) {
 			vskip++;
 			continue;
 		}
-		for ( int j=IMIN; j<IMAX; j++ ) {
-			int xx = x+j;
+		for ( auto j=IMIN; j<IMAX; j++ ) {
+			auto xx = x+j;
 			if ( xx < 0 || fpip->w <= xx || ( list[0] != nullptr && ( (list[0][0] == i && list[0][1] == j) || (list[1][0] == i && list[1][1] == j) )) ) {
 				hskip++;
 				continue;
 			}
-			sum += YCP_EDIT(fpip, xx, yy)->cr;
+			sum += ycp_edit(fpip, xx, yy)->cr;
 		}
 	}
 	
