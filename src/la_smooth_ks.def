@@ -1,4 +1,5 @@
 LIBRARY la_smooth_ks
 
 EXPORTS
-	GetFilterTable @1
+	GetFilterPluginTable @1
+	UninitializePlugin @2

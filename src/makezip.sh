@@ -2,4 +2,4 @@
 
 VERSION=$(grep '#define VERSION' version.hpp | sed -E 's/.*"([^"]+)".*/\1/')
 
-zip "../$1.${VERSION}.zip" ../$1.auf
+zip "../$1.${VERSION}.zip" ../$1.auf2

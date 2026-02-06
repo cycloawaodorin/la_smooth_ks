@@ -1,1 +1,1 @@
-#define VERSION L"0.1.0"
+#define VERSION L"1.0.0"

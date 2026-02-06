@@ -8,7 +8,7 @@ LIBS = -static
 RM = rm -f
 SH = bash
 
-TARGET = la_smooth_ks.auf
+TARGET = la_smooth_ks.auf2
 OBJ = la_smooth_ks.o
 DEF = la_smooth_ks.def
 
@@ -22,7 +22,7 @@ $(TARGET): $(OBJ) $(DEF)
 .cpp.o:
 	$(CXX) $(CXXWFLAGS) $(CXXFLAGS) $(INCLUDES) -o $@ $<
 
-la_smooth_ks.o: filter.hpp
+la_smooth_ks.o: filter2.hpp
 
 clean:
 	rm -f $(TARGET) $(OBJ)
